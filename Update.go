@@ -3,6 +3,7 @@ package HandleBolt
 import (
 	"github.com/boltdb/bolt"
 	"sync"
+	"fmt"
 )
 
 //TODO:需要支持key,value的值是任意类型
@@ -25,6 +26,8 @@ func (D *Db)ChangeData(BucketName,key,value interface{})error{
 	return nil
 }
 
+//TODO:创建数据库
+
 //查询数据库中的全部数据，返回值采用map
 func (D *Db)SearchAllData(BucketName string)map[string]string{
 	//sync map只是随便练手写的，不适配当前情况
@@ -34,7 +37,7 @@ func (D *Db)SearchAllData(BucketName string)map[string]string{
 		cur := b.Cursor()
 		for k, v := cur.First(); k != nil; k, v = cur.Next() {
 			data.Store(string(k),string(v))
-			//fmt.Printf("key is %s,value is %s\n", k, v)
+			//fmt.Printf("key is %v,value is %s\n", bytesToInt(k), v)
 		}
 		return nil
 	})
@@ -48,13 +51,51 @@ func (D *Db)SearchAllData(BucketName string)map[string]string{
 
 //TODO:查询范围内的数据
 
-//TODO:按照自增序列存储数据  1----value  2---value
-
-//TODO:获取所有数据
 
 
 
-//同时插入大量数据
+//一般没啥用
+func (D *Db)SaveDataBySequence(BucketName string,datas []string)error{
+	for i := 0; i < len(datas); i++ {
+		if err := D.Db.Update(func(tx *bolt.Tx) error {
+			if _, err := tx.CreateBucketIfNotExists([]byte(BucketName)); err != nil {
+				return err
+			}
+			b := tx.Bucket([]byte(BucketName))
+			id, _ := b.NextSequence()
+			err := b.Put(u64tob(id), []byte(datas[i]))
+			fmt.Println(u64tob(id))
+			return err
+		}); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func (D *Db)SearchAllSequenceData(BucketName string)(map[int64]string)  {
+	//sync map只是随便练手写的，不适配当前情况
+	data:=sync.Map{}
+	_=D.Db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(BucketName))
+		cur := b.Cursor()
+		for k, v := cur.First(); k != nil; k, v = cur.Next() {
+			data.Store(BytesToInt64(k),string(v))
+			//fmt.Printf("key is %v,value is %s\n", bytesToInt(k), v)
+		}
+		return nil
+	})
+	result:=make(map[int64]string,0)
+	data.Range(func(key, value interface{}) bool {
+		result[key.(int64)]=value.(string)
+		return true
+	})
+	return result
+}
+
+
+//插入大量数据
 func (D *Db)InertDatas(BucketName string,datas map[string]string)  {
 	var wg sync.WaitGroup
 	wg.Add(len(datas))
