@@ -2,18 +2,24 @@ package HandleBolt
 
 import (
 	"github.com/boltdb/bolt"
-	"time"
+	//"time"
 )
 
-var(
+type Db struct {
 	Db *bolt.DB
-)
-func initDB(BucketName string) *bolt.DB {
-	db,_:=bolt.Open("mydb.db",0600,&bolt.Options{Timeout:1*time.Second})
-	Db=db
-	Db.Update(func(tx *bolt.Tx) error {
+}
+
+//初始化数据库
+func InitDb(BucketName string)(*Db,error){
+	//打开数据库
+	db,_:=bolt.Open("mydb.db",0600,nil)//&bolt.Options{Timeout:1*time.Second})
+	var D=new(Db)
+	D.Db=db
+	//新建数据库表
+	err:=D.Db.Update(func(tx *bolt.Tx) error {
 		_,err:=tx.CreateBucket([]byte(BucketName))
 		return err
 	})
-	return Db
+
+	return D,err
 }

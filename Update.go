@@ -4,11 +4,12 @@ import (
 	"github.com/boltdb/bolt"
 	"sync"
 )
-//TODO:需要支持key,value的值是任意类型
 
+//TODO:需要支持key,value的值是任意类型
+//目前支持的情况只是存储json字符串。
 //新增修改单个的数据项
-func ChangeData(BucketName,key,value interface{})error{
- 	if err:=Db.Update(func(tx *bolt.Tx) error {
+func (D *Db)ChangeData(BucketName,key,value interface{})error{
+ 	if err:=D.Db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(BucketName.(string))); err != nil {
 			return err
 		}
@@ -25,16 +26,14 @@ func ChangeData(BucketName,key,value interface{})error{
 }
 
 //查询数据库中的全部数据，返回值采用map
-func SearchAllData(BucketName string)map[string]string{
+func (D *Db)SearchAllData(BucketName string)map[string]string{
+	//sync map只是随便练手写的，不适配当前情况
 	data:=sync.Map{}
-	_=Db.View(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte(BucketName)); err != nil {
-			return err
-		}
+	_=D.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BucketName))
 		cur := b.Cursor()
 		for k, v := cur.First(); k != nil; k, v = cur.Next() {
-			data.Store(k,v)
+			data.Store(string(k),string(v))
 			//fmt.Printf("key is %s,value is %s\n", k, v)
 		}
 		return nil
@@ -56,13 +55,13 @@ func SearchAllData(BucketName string)map[string]string{
 
 
 //同时插入大量数据
-func InertDatas(BucketName string,datas map[string]string)  {
+func (D *Db)InertDatas(BucketName string,datas map[string]string)  {
 	var wg sync.WaitGroup
 	wg.Add(len(datas))
 	for k,v:=range datas{
 		go func(key,value string) {
-			wg.Done()
-			_=Db.Batch(func(tx *bolt.Tx) error {
+			defer wg.Done()
+			_=D.Db.Batch(func(tx *bolt.Tx) error {
 				return tx.Bucket([]byte(BucketName)).Put([]byte(key), []byte(value))
 			})
 		}(k,v)
@@ -71,14 +70,12 @@ func InertDatas(BucketName string,datas map[string]string)  {
 }
 
 //查询单条数据
-func ReadOneData(BucketName , key string)(string){
+func(D *Db) ReadOneData(BucketName , key string)(string){
 	var result []byte
-	if err:=Db.View(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte(BucketName)); err != nil {
-			return err
-		}
+	if err:=D.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BucketName))
 		result=b.Get([]byte(key))
+		return nil
 		//return string(result),nil
 	});err!=nil{
 		return ""
@@ -87,8 +84,8 @@ func ReadOneData(BucketName , key string)(string){
 }
 
 //删除数据库中某个内容
-func RemoveData(BucketName,key string)error{
-	if err:=Db.Update(func(tx *bolt.Tx) error {
+func(D *Db) RemoveData(BucketName,key string)error{
+	if err:=D.Db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(BucketName)); err != nil {
 			return err
 		}
@@ -105,10 +102,11 @@ func RemoveData(BucketName,key string)error{
 }
 
 //删库
-func RemoveBucket (BucketName string)error{
-	if err:=Db.Update(func(tx *bolt.Tx) error {
-		b:=tx.Bucket([]byte(BucketName))
-		if err:=b.DeleteBucket([]byte(BucketName));err!=nil{
+func (D *Db)RemoveBucket (BucketName string)error{
+	if err:=D.Db.Update(func(tx *bolt.Tx) error {
+		//b:=tx.Bucket([]byte(BucketName))
+		err:=tx.DeleteBucket([]byte(BucketName))
+		if err!=nil{
 			return err
 		}
 		return nil
