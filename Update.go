@@ -1,6 +1,7 @@
 package HandleBolt
 
 import (
+	"bytes"
 	"github.com/boltdb/bolt"
 	"sync"
 	"fmt"
@@ -27,6 +28,14 @@ func (D *Db)ChangeData(BucketName,key,value interface{})error{
 }
 
 //TODO:创建数据库
+func (D *Db)CreateBucket(BucketName string)error{
+	err:=D.Db.Update(func(tx *bolt.Tx) error {
+		_,err:=tx.CreateBucket([]byte(BucketName))
+		return err
+	})
+	return err
+}
+
 
 //查询数据库中的全部数据，返回值采用map
 func (D *Db)SearchAllData(BucketName string)map[string]string{
@@ -50,11 +59,33 @@ func (D *Db)SearchAllData(BucketName string)map[string]string{
 }
 
 //TODO:查询范围内的数据
+//范围搜索
+func (D *Db) SearchRangeData(BucketName,startData,endData string)map[string]string{
+	result:=make(map[string]string,0)
+	 if err:=D.Db.View(func(tx *bolt.Tx) error {
+		// Assume our events bucket exists and has RFC3339 encoded time keys.
+		c := tx.Bucket([]byte(BucketName)).Cursor()
+
+		// Our time range spans the 90's decade.
+		min := []byte(startData)
+		max := []byte(endData)
+
+		// Iterate over the 90's.
+		for k, v := c.Seek(min); k != nil && bytes.Compare(k, max) <= 0; k, v = c.Next() {
+			//fmt.Printf("%s: %s\n", k, v)
+			result[string(k)]=string(v)
+		}
+
+		return nil
+	});err!=nil{
+
+	 }
+	return result
+}
 
 
 
-
-//一般没啥用
+//一般没啥用 存储格式为  1----value   2-----value
 func (D *Db)SaveDataBySequence(BucketName string,datas []string)error{
 	for i := 0; i < len(datas); i++ {
 		if err := D.Db.Update(func(tx *bolt.Tx) error {
@@ -81,7 +112,7 @@ func (D *Db)SearchAllSequenceData(BucketName string)(map[int64]string)  {
 		b := tx.Bucket([]byte(BucketName))
 		cur := b.Cursor()
 		for k, v := cur.First(); k != nil; k, v = cur.Next() {
-			data.Store(BytesToInt64(k),string(v))
+			data.Store(bytesToInt64(k),string(v))
 			//fmt.Printf("key is %v,value is %s\n", bytesToInt(k), v)
 		}
 		return nil
@@ -109,6 +140,8 @@ func (D *Db)InertDatas(BucketName string,datas map[string]string)  {
 	}
 	wg.Wait()
 }
+
+//TODO：批量删除相关数据
 
 //查询单条数据
 func(D *Db) ReadOneData(BucketName , key string)(string){

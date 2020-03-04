@@ -12,7 +12,7 @@ func Int64ToBytes(i int64) []byte {
 }
 
 //字节转换成整形
-func BytesToInt64(buf []byte) int64 {
+func bytesToInt64(buf []byte) int64 {
 	return int64(binary.BigEndian.Uint64(buf))
 }
 func u64tob(v uint64) []byte {
